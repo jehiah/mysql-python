@@ -24,9 +24,11 @@ _mysql_ConnectionObject_Initialize(
 				  "named_pipe", "init_command",
 				  "read_default_file", "read_default_group",
 				  "client_flag", "ssl",
-				  "local_infile",
+				  "local_infile", "read_timeout", "write_timeout",
 				  NULL } ;
 	int connect_timeout = 0;
+    int read_timeout = 0;
+    int write_timeout = 0;
 	int compress = -1, named_pipe = -1, local_infile = -1;
 	char *init_command=NULL,
 	     *read_default_file=NULL,
@@ -34,7 +36,7 @@ _mysql_ConnectionObject_Initialize(
 	
 	self->open = 0;
 	check_server_init(-1);
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssisiiisssiOi:connect",
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssisiiisssiOiii:connect",
 					 kwlist,
 					 &host, &user, &passwd, &db,
 					 &port, &unix_socket,
@@ -43,7 +45,9 @@ _mysql_ConnectionObject_Initialize(
 					 &init_command, &read_default_file,
 					 &read_default_group,
 					 &client_flag, &ssl,
-					 &local_infile
+					 &local_infile,
+					 &read_timeout,
+					 &write_timeout,
 					 ))
 		return -1;
 
@@ -70,8 +74,15 @@ _mysql_ConnectionObject_Initialize(
 	conn = mysql_init(&(self->connection));
 	if (connect_timeout) {
 		unsigned int timeout = connect_timeout;
-		mysql_options(&(self->connection), MYSQL_OPT_CONNECT_TIMEOUT, 
-				(char *)&timeout);
+		mysql_options(&(self->connection), MYSQL_OPT_CONNECT_TIMEOUT, (char *)&timeout);
+	}
+	if (read_timeout) {
+		unsigned int timeout = read_timeout;
+		mysql_options(&(self->connection), MYSQL_OPT_READ_TIMEOUT, (char *)&timeout);
+	}
+	if (write_timeout) {
+		unsigned int timeout = write_timeout;
+		mysql_options(&(self->connection), MYSQL_OPT_WRITE_TIMEOUT, (char *)&timeout);
 	}
 	if (compress != -1) {
 		mysql_options(&(self->connection), MYSQL_OPT_COMPRESS, 0);
