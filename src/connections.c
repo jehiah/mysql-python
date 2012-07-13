@@ -48,8 +48,9 @@ _mysql_ConnectionObject_Initialize(
 					 &local_infile,
 					 &read_timeout,
 					 &write_timeout
-					 ))
+					 )) {
 		return -1;
+	 }
 
 #define _stringsuck(d,t,s) {t=PyMapping_GetItemString(s,#d);\
         if(t){d=PyString_AsString(t);Py_DECREF(t);}\
