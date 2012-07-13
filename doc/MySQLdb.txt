@@ -302,6 +302,10 @@ connect(parameters...)
             Abort if connect is not completed within
             given number of seconds. Default: no timeout (?)
 
+         read_timeout
+
+         write_timeout
+
          named_pipe
             Use a named pipe (Windows). Default: don't.
 

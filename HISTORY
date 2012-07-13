@@ -1,4 +1,10 @@
 =====================
+ What's new in 1.3.1
+=====================
+
+new connect parameters read_timeout, write_timeout
+
+=====================
  What's new in 1.2.3
 =====================
 

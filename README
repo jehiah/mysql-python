@@ -44,8 +44,7 @@ Prerequisites
 
   * MySQL-5.0 is supported and tested, including stored procedures.
 
-  * MySQL-5.1 is supported (currently a release candidate) but untested.
-    It should work.
+  * MySQL-5.1 is supported and tested
 
   * MySQL-6.0 is sorta-kinda-supported (currently alpha) but untested.
     It should work.
