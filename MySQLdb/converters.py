@@ -1,197 +1,171 @@
+"""MySQLdb type conversion module
+
+This module handles all the type conversions for MySQL. If the default
+type conversions aren't what you need, you can make your own. The
+dictionary conversions maps some kind of type to a conversion function
+which returns the corresponding value:
+
+Key: FIELD_TYPE.* (from MySQLdb.constants)
+
+Conversion function:
+
+    Arguments: string
+
+    Returns: Python object
+
+Key: Python type object (from types) or class
+
+Conversion function:
+
+    Arguments: Python object of indicated type or class AND 
+               conversion dictionary
+
+    Returns: SQL literal value
+
+    Notes: Most conversion functions can ignore the dictionary, but
+           it is a required parameter. It is necessary for converting
+           things like sequences and instances.
+
+Don't modify conversions if you can avoid it. Instead, make copies
+(with the copy() method), modify the copies, and then pass them to
+MySQL.connect().
+
 """
-MySQLdb type conversion module
-------------------------------
 
-
-
-"""
-
-from _mysql import NULL
-from MySQLdb.constants import FIELD_TYPE, FLAG
-from MySQLdb.times import datetime_to_sql, timedelta_to_sql, \
-     timedelta_or_orig, datetime_or_orig, date_or_orig, \
-     timestamp_or_orig
-from types import InstanceType
+from _mysql import string_literal, escape_sequence, escape_dict, escape, NULL
+from constants import FIELD_TYPE, FLAG
+from times import *
+import types
 import array
-import datetime
-from decimal import Decimal
-from itertools import izip
 
-def bool_to_sql(connection, boolean):
-    """Convert a Python bool to an SQL literal."""
-    return str(int(boolean))
+try:
+    set
+except NameError:
+    from sets import Set as set
 
-def SET_to_Set(value):
-    """Convert MySQL SET column to Python set."""
-    return set([ i for i in value.split(',') if i ])
+def Bool2Str(s, d): return str(int(s))
 
-def Set_to_sql(connection, value):
-    """Convert a Python set to an SQL literal."""
-    return connection.string_literal(','.join(value))
+def Str2Set(s):
+    return set([ i for i in s.split(',') if i ])
 
-def object_to_sql(connection, obj):
-    """Convert something into a string via str().
-    The result will not be quoted."""
-    return connection.escape_string(str(obj))
+def Set2Str(s, d):
+    return string_literal(','.join(s), d)
+    
+def Thing2Str(s, d):
+    """Convert something into a string via str()."""
+    return str(s)
 
-def unicode_to_sql(connection, value):
-    """Convert a unicode object to a string using the connection encoding."""
-    return connection.string_literal(value.encode(connection.character_set_name()))
+def Unicode2Str(s, d):
+    """Convert a unicode object to a string using the default encoding.
+    This is only used as a placeholder for the real function, which
+    is connection-dependent."""
+    return s.encode()
 
-def float_to_sql(connection, value):
-    return '%.15g' % value
+Long2Int = Thing2Str
 
-def None_to_sql(connection, value):
+def Float2Str(o, d):
+    return '%.15g' % o
+
+def None2NULL(o, d):
     """Convert None to NULL."""
     return NULL # duh
 
-def None_if_NULL(func):
-    if func is None: return func
-    def _None_if_NULL(value):
-        if value is None: return value
-        return func(value)
-    _None_if_NULL.__name__ = func.__name__+"_or_None_if_NULL"
-    return _None_if_NULL
+def Thing2Literal(o, d):
+    
+    """Convert something into a SQL string literal.  If using
+    MySQL-3.23 or newer, string_literal() is a method of the
+    _mysql.MYSQL object, and this function will be overridden with
+    that method when the connection is created."""
+
+    return string_literal(o, d)
 
 
-int_or_None_if_NULL = None_if_NULL(int)
-float_or_None_if_NULL = None_if_NULL(float)
-Decimal_or_None_if_NULL = None_if_NULL(Decimal)
-SET_to_Set_or_None_if_NULL = None_if_NULL(SET_to_Set)
-timestamp_or_None_if_NULL = None_if_NULL(timestamp_or_orig)
-datetime_or_None_if_NULL = None_if_NULL(datetime_or_orig)
-date_or_None_if_NULL = None_if_NULL(date_or_orig)
-timedelta_or_None_if_NULL = None_if_NULL(timedelta_or_orig)
+def Instance2Str(o, d):
 
-def object_to_quoted_sql(connection, obj):
-    """Convert something into a SQL string literal."""
-    if hasattr(obj, "__unicode__"):
-        return unicode_to_sql(connection, obj)
-    return connection.string_literal(str(obj))
+    """
 
-def instance_to_sql(connection, obj):
-    """Convert an Instance to a string representation.  If the __str__()
+    Convert an Instance to a string representation.  If the __str__()
     method produces acceptable output, then you don't need to add the
     class to conversions; it will be handled by the default
-    converter. If the exact class is not found in conv, it will use the
-    first class it can find for which obj is an instance.
+    converter. If the exact class is not found in d, it will use the
+    first class it can find for which o is an instance.
+
     """
-    if obj.__class__ in conv:
-        return conv[obj.__class__](obj, conv)
-    classes = [ key for key in conv.keys()
-                if isinstance(obj, key) ]
-    if not classes:
-        return conv[types.StringType](obj, conv)
-    conv[obj.__class__] = conv[classes[0]]
-    return conv[classes[0]](obj, conv)
 
-def array_to_sql(connection, obj):
-    return connection.string_literal(obj.tostring())
+    if d.has_key(o.__class__):
+        return d[o.__class__](o, d)
+    cl = filter(lambda x,o=o:
+                type(x) is types.ClassType
+                and isinstance(o, x), d.keys())
+    if not cl and hasattr(types, 'ObjectType'):
+        cl = filter(lambda x,o=o:
+                    type(x) is types.TypeType
+                    and isinstance(o, x)
+                    and d[x] is not Instance2Str,
+                    d.keys())
+    if not cl:
+        return d[types.StringType](o,d)
+    d[o.__class__] = d[cl[0]]
+    return d[cl[0]](o, d)
 
-simple_type_encoders = {
-    int: object_to_sql,
-    long: object_to_sql,
-    float: float_to_sql,
-    type(None): None_to_sql,
-    unicode: unicode_to_sql,
-    object: instance_to_sql,
-    bool: bool_to_sql,
-    datetime.datetime: datetime_to_sql,
-    datetime.timedelta: timedelta_to_sql,
-    set: Set_to_sql,
-    str: object_to_quoted_sql, # default
-}
+def char_array(s):
+    return array.array('c', s)
 
-# This is for MySQL column types that can be converted directly
-# into Python types without having to look at metadata (flags,
-# character sets, etc.). This should always be used as the last
-# resort.
-simple_field_decoders = {
-    FIELD_TYPE.TINY: int_or_None_if_NULL,
-    FIELD_TYPE.SHORT: int_or_None_if_NULL,
-    FIELD_TYPE.LONG: int_or_None_if_NULL,
-    FIELD_TYPE.FLOAT: float_or_None_if_NULL,
-    FIELD_TYPE.DOUBLE: float_or_None_if_NULL,
-    FIELD_TYPE.DECIMAL: Decimal_or_None_if_NULL,
-    FIELD_TYPE.NEWDECIMAL: Decimal_or_None_if_NULL,
-    FIELD_TYPE.LONGLONG: int_or_None_if_NULL,
-    FIELD_TYPE.INT24: int_or_None_if_NULL,
-    FIELD_TYPE.YEAR: int_or_None_if_NULL,
-    FIELD_TYPE.SET: SET_to_Set_or_None_if_NULL,
-    FIELD_TYPE.TIMESTAMP: timestamp_or_None_if_NULL,
-    FIELD_TYPE.DATETIME: datetime_or_None_if_NULL,
-    FIELD_TYPE.TIME: timedelta_or_None_if_NULL,
-    FIELD_TYPE.DATE: date_or_None_if_NULL,
-}
+def array2Str(o, d):
+    return Thing2Literal(o.tostring(), d)
 
-# Decoder protocol
-# Each decoder is passed a field object.
-# The decoder returns a single value:
-# * A callable that given an SQL value, returns a Python object.
-# This can be as simple as int or str, etc. If the decoder
-# returns None, this decoder will be ignored and the next decoder
-# on the stack will be checked.
+conversions = {
+    types.IntType: Thing2Str,
+    types.LongType: Long2Int,
+    types.FloatType: Float2Str,
+    types.NoneType: None2NULL,
+    types.TupleType: escape_sequence,
+    types.ListType: escape_sequence,
+    types.DictType: escape_dict,
+    types.InstanceType: Instance2Str,
+    array.ArrayType: array2Str,
+    types.StringType: Thing2Literal, # default
+    types.UnicodeType: Unicode2Str,
+    types.ObjectType: Instance2Str,
+    types.BooleanType: Bool2Str,
+    DateTimeType: DateTime2literal,
+    DateTimeDeltaType: DateTimeDelta2literal,
+    set: Set2Str,
+    FIELD_TYPE.TINY: int,
+    FIELD_TYPE.SHORT: int,
+    FIELD_TYPE.LONG: long,
+    FIELD_TYPE.FLOAT: float,
+    FIELD_TYPE.DOUBLE: float,
+    FIELD_TYPE.DECIMAL: float,
+    FIELD_TYPE.NEWDECIMAL: float,
+    FIELD_TYPE.LONGLONG: long,
+    FIELD_TYPE.INT24: int,
+    FIELD_TYPE.YEAR: int,
+    FIELD_TYPE.SET: Str2Set,
+    FIELD_TYPE.TIMESTAMP: mysql_timestamp_converter,
+    FIELD_TYPE.DATETIME: DateTime_or_None,
+    FIELD_TYPE.TIME: TimeDelta_or_None,
+    FIELD_TYPE.DATE: Date_or_None,
+    FIELD_TYPE.BLOB: [
+        (FLAG.BINARY, str),
+        ],
+    FIELD_TYPE.STRING: [
+        (FLAG.BINARY, str),
+        ],
+    FIELD_TYPE.VAR_STRING: [
+        (FLAG.BINARY, str),
+        ],
+    FIELD_TYPE.VARCHAR: [
+        (FLAG.BINARY, str),
+        ],
+    }
 
-def default_decoder(field):
-    return str
+try:
+    from decimal import Decimal
+    conversions[FIELD_TYPE.DECIMAL] = Decimal
+    conversions[FIELD_TYPE.NEWDECIMAL] = Decimal
+except ImportError:
+    pass
 
-def default_encoder(value):
-    return object_to_quoted_sql
 
-def simple_decoder(field):
-    return simple_field_decoders.get(field.type, None)
-
-def simple_encoder(value):
-    return simple_type_encoders.get(type(value), None)
-
-character_types = [
-    FIELD_TYPE.BLOB, 
-    FIELD_TYPE.STRING,
-    FIELD_TYPE.VAR_STRING,
-    FIELD_TYPE.VARCHAR,
-]
-
-def character_decoder(field):
-    if field.type not in character_types:
-        return None
-    if field.charsetnr == 63: # BINARY
-        return str
-
-    charset = field.result.connection.character_set_name()
-    def char_to_unicode(s):
-        if s is None:
-            return s
-        return s.decode(charset)
-
-    return char_to_unicode
-
-default_decoders = [
-    character_decoder,
-    simple_decoder,
-    default_decoder,
-]
-
-default_encoders = [
-    simple_encoder,
-    default_encoder,
-]
-
-def get_codec(field, codecs):
-    for c in codecs:
-        func = c(field)
-        if func:
-            return func
-    # the default codec is guaranteed to work
-
-def iter_row_decoder(decoders, row):
-    if row is None:
-        return None
-    return ( d(col) for d, col in izip(decoders, row) )
-
-def tuple_row_decoder(decoders, row):
-    if row is None:
-        return None
-    return tuple(iter_row_decoder(decoders, row))
-
-default_row_formatter = tuple_row_decoder
 

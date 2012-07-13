@@ -1,11 +1,13 @@
 recursive-include doc *.txt
+recursive-include tests *.py
 include MANIFEST.in
 include MANIFEST
 include ChangeLog
 include HISTORY
 include GPL
-recursive-include tests *.py
+include pymemcompat.h
 include metadata.cfg
 include site.cfg
-include setup_*.py
-include ez_setup.py
+include setup_common.py
+include setup_posix.py
+include setup_windows.py

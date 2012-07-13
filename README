@@ -44,7 +44,8 @@ Prerequisites
 
   * MySQL-5.0 is supported and tested, including stored procedures.
 
-  * MySQL-5.1 is supported and tested
+  * MySQL-5.1 is supported (currently a release candidate) but untested.
+    It should work.
 
   * MySQL-6.0 is sorta-kinda-supported (currently alpha) but untested.
     It should work.
@@ -249,4 +250,4 @@ GPL or the original license based on Python 1.5.2's license.
 
 
 :Author: Andy Dustman <andy@dustman.net>
-:Revision: $Id$
+:Revision: $Id: README 641 2010-02-25 21:28:13Z kylev $

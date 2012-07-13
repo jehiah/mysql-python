@@ -40,28 +40,27 @@ class test_MySQLdb(capabilities.DatabaseTest):
     def test_stored_procedures(self):
         db = self.connection
         c = self.cursor
-        try:
-            self.create_table(('pos INT', 'tree CHAR(20)'))
-            c.executemany("INSERT INTO %s (pos,tree) VALUES (%%s,%%s)" % self.table,
-                          list(enumerate('ash birch cedar larch pine'.split())))
-            db.commit()
-            
-            c.execute("""
-            CREATE PROCEDURE test_sp(IN t VARCHAR(255))
-            BEGIN
-                SELECT pos FROM %s WHERE tree = t;
-            END
-            """ % self.table)
-            db.commit()
-    
-            c.callproc('test_sp', ('larch',))
-            rows = c.fetchall()
-            self.assertEquals(len(rows), 1)
-            self.assertEquals(rows[0][0], 3)
-            c.nextset()
-        finally:
-            c.execute("DROP PROCEDURE IF EXISTS test_sp")
-            c.execute('drop table %s' % (self.table))
+        self.create_table(('pos INT', 'tree CHAR(20)'))
+        c.executemany("INSERT INTO %s (pos,tree) VALUES (%%s,%%s)" % self.table,
+                      list(enumerate('ash birch cedar larch pine'.split())))
+        db.commit()
+        
+        c.execute("""
+        CREATE PROCEDURE test_sp(IN t VARCHAR(255))
+        BEGIN
+            SELECT pos FROM %s WHERE tree = t;
+        END
+        """ % self.table)
+        db.commit()
+
+        c.callproc('test_sp', ('larch',))
+        rows = c.fetchall()
+        self.assertEquals(len(rows), 1)
+        self.assertEquals(rows[0][0], 3)
+        c.nextset()
+        
+        c.execute("DROP PROCEDURE test_sp")
+        c.execute('drop table %s' % (self.table))
 
     def test_small_CHAR(self):
         # Character data
@@ -73,7 +72,7 @@ class test_MySQLdb(capabilities.DatabaseTest):
         self.check_data_integrity(
             ('col1 char(1)','col2 char(1)'),
             generator)
-
+    
     def test_bug_2671682(self):
         from MySQLdb.constants import ER
         try:
@@ -81,31 +80,10 @@ class test_MySQLdb(capabilities.DatabaseTest):
         except self.connection.ProgrammingError, msg:
             self.failUnless(msg[0] == ER.NO_SUCH_TABLE)
     
-    def test_INSERT_VALUES(self):
-        from MySQLdb.cursors import INSERT_VALUES
-        query = """INSERT FOO (a, b, c) VALUES (%s, %s, %s)"""
-        matched = INSERT_VALUES.match(query)
-        self.failUnless(matched)
-        start = matched.group('start')
-        end = matched.group('end')
-        values = matched.group('values')
-        self.failUnless(start == """INSERT FOO (a, b, c) VALUES """)
-        self.failUnless(values == "(%s, %s, %s)")
-        self.failUnless(end == "")
-        
     def test_ping(self):
         self.connection.ping()
-
-    def test_literal_int(self):
-        self.failUnless("2" == self.connection.literal(2))
-    
-    def test_literal_float(self):
-        self.failUnless("3.1415" == self.connection.literal(3.1415))
         
-    def test_literal_string(self):
-        self.failUnless("'foo'" == self.connection.literal("foo"))
         
-    
 if __name__ == '__main__':
     if test_MySQLdb.leak_test:
         import gc
