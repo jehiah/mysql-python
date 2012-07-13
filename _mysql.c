@@ -490,8 +490,12 @@ _mysql_ConnectionObject_Initialize(
 				  "read_default_file", "read_default_group",
 				  "client_flag", "ssl",
 				  "local_infile",
+				  "read_timeout",
+				  "write_timeout",
 				  NULL } ;
 	int connect_timeout = 0;
+	int read_timeout = 0;
+	int write_timeout = 0;
 	int compress = -1, named_pipe = -1, local_infile = -1;
 	char *init_command=NULL,
 	     *read_default_file=NULL,
@@ -500,7 +504,7 @@ _mysql_ConnectionObject_Initialize(
 	self->converter = NULL;
 	self->open = 0;
 	check_server_init(-1);
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssisOiiisssiOi:connect",
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssisOiiisssiOiii:connect",
 					 kwlist,
 					 &host, &user, &passwd, &db,
 					 &port, &unix_socket, &conv,
@@ -509,8 +513,10 @@ _mysql_ConnectionObject_Initialize(
 					 &init_command, &read_default_file,
 					 &read_default_group,
 					 &client_flag, &ssl,
-					 &local_infile /* DO NOT PATCH FOR RECONNECT, IDIOTS
+					 &local_infile, /* DO NOT PATCH FOR RECONNECT, IDIOTS
 					 IF YOU DO THIS, I WILL NOT SUPPORT YOUR PACKAGES. */
+					 &read_timeout,
+					 &write_timeout
 					 ))
 		return -1;
 
@@ -538,6 +544,16 @@ _mysql_ConnectionObject_Initialize(
 	if (connect_timeout) {
 		unsigned int timeout = connect_timeout;
 		mysql_options(&(self->connection), MYSQL_OPT_CONNECT_TIMEOUT, 
+				(char *)&timeout);
+	}
+	if (read_timeout) {
+		unsigned int timeout = read_timeout;
+		mysql_options(&(self->connection), MYSQL_OPT_READ_TIMEOUT, 
+				(char *)&timeout);
+	}
+	if (write_timeout) {
+		unsigned int timeout = write_timeout;
+		mysql_options(&(self->connection), MYSQL_OPT_WRITE_TIMEOUT, 
 				(char *)&timeout);
 	}
 	if (compress != -1) {

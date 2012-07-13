@@ -1,3 +1,9 @@
+============
+patched
+============
+
+Add read_timeout, write_timeout connection parameters
+
 =====================
  What's new in 1.2.3
 =====================
