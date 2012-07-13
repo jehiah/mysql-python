@@ -47,7 +47,7 @@ _mysql_ConnectionObject_Initialize(
 					 &client_flag, &ssl,
 					 &local_infile,
 					 &read_timeout,
-					 &write_timeout,
+					 &write_timeout
 					 ))
 		return -1;
 
